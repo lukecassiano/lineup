@@ -1,58 +1,47 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { type LucideProps, Map as MapIcon, Users, User, Waves, Plus } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Plus } from "lucide-react";
 
+import Home from "@/components/Home";
+import Dock, { type DockView } from "@/components/Dock";
 import CrewsList from "@/components/CrewsList";
 import CrewThread from "@/components/CrewThread";
 import MapView from "@/components/MapView";
 import SpotSheet from "@/components/SpotSheet";
 import NewPinSheet from "@/components/NewPinSheet";
+import NewCrewSheet from "@/components/NewCrewSheet";
+import PostComposer from "@/components/PostComposer";
 import LogModal from "@/components/LogModal";
 import Community from "@/components/Community";
-import Profile, { buildBadges } from "@/components/Profile";
+import Profile, { buildBadges, type Badge } from "@/components/Profile";
+import { BadgeSheet, BadgeUnlock } from "@/components/Badges";
 
 import type { Crew, Spot, CommunityPost, Session } from "@/lib/types";
-import { SEED_CREWS, SEED_COMMUNITY, INITIAL_DISCOVERED } from "@/lib/seed";
+import {
+  SEED_CREWS,
+  SEED_COMMUNITY,
+  SEED_SESSIONS,
+  INITIAL_DISCOVERED,
+  SPOTS,
+} from "@/lib/seed";
+import { CA_SPOTS } from "@/lib/spots";
 import { storage, STATE_KEY } from "@/lib/storage";
 
-type View = "crews" | "map" | "community" | "profile";
+type View = "home" | "crews" | "map" | "feed" | "profile";
 
-function PillBtn({
-  icon: Icon,
-  active,
-  onClick,
-}: {
-  icon: React.ComponentType<LucideProps>;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        flex: 1,
-        height: 48,
-        borderRadius: 100,
-        background: active ? "rgba(243,232,210,.14)" : "none",
-        border: "none",
-        cursor: "pointer",
-        display: "grid",
-        placeItems: "center",
-        color: active ? "var(--mustard)" : "rgba(243,232,210,.38)",
-        transition: "all .15s",
-      }}
-    >
-      <Icon size={20} strokeWidth={active ? 2.2 : 1.6} />
-    </button>
-  );
-}
+const SAMPLE_CLIP = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4";
+const SEED_CREW_COUNT = SEED_CREWS.length;
 
-export default function Home() {
-  const [view, setView] = useState<View>("crews");
+export default function Home_Page() {
+  const [view, setView] = useState<View>("home");
   const [activeCrew, setActiveCrew] = useState<Crew | null>(null);
   const [activeSpot, setActiveSpot] = useState<Spot | null>(null);
   const [logging, setLogging] = useState(false);
+  const [composing, setComposing] = useState(false);
+  const [creatingCrew, setCreatingCrew] = useState(false);
+  const [activeBadge, setActiveBadge] = useState<Badge | null>(null);
+  const [unlockedBadge, setUnlockedBadge] = useState<Badge | null>(null);
   const [draft, setDraft] = useState("");
 
   // Drop-pin flow
@@ -62,7 +51,7 @@ export default function Home() {
   // App state (persisted)
   const [crews, setCrews] = useState<Crew[]>(SEED_CREWS);
   const [community, setCommunity] = useState<CommunityPost[]>(SEED_COMMUNITY);
-  const [mySessions, setMySessions] = useState<Session[]>([]);
+  const [mySessions, setMySessions] = useState<Session[]>(SEED_SESSIONS);
   const [userPins, setUserPins] = useState<Spot[]>([]);
   const [discovered, setDiscovered] = useState<string[]>(INITIAL_DISCOVERED);
   const [hydrated, setHydrated] = useState(false);
@@ -85,19 +74,48 @@ export default function Home() {
     })();
   }, []);
 
-  const persist = (patch: Partial<{
-    mySessions: Session[];
-    crews: Crew[];
-    community: CommunityPost[];
-    userPins: Spot[];
-    discovered: string[];
-  }>) => {
+  const persist = (
+    patch: Partial<{
+      mySessions: Session[];
+      crews: Crew[];
+      community: CommunityPost[];
+      userPins: Spot[];
+      discovered: string[];
+    }>
+  ) => {
     const next = { mySessions, crews, community, userPins, discovered, ...patch };
     storage.set(STATE_KEY, JSON.stringify(next)).catch(() => {});
   };
 
-  // ── Actions ──────────────────────────────────────────────────────────
+  // ── Derived ─────────────────────────────────────────────────────────────────
+  const sessionCount = 23 + mySessions.length;
+  const streak = 5 + Math.max(0, mySessions.length - SEED_SESSIONS.length);
+  const collected = discovered.length;
+  const total = SPOTS.length + userPins.length;
+  const extraCrews = Math.max(0, crews.length - SEED_CREW_COUNT);
+  const badges = buildBadges({ mySessions, userPins, sessionCount, collected, extraCrews });
+  const firingSpot = CA_SPOTS.find((s) => s.cond === "firing") ?? CA_SPOTS[0];
+  const currentCrew = activeCrew ? crews.find((c) => c.id === activeCrew.id) ?? null : null;
 
+  // ── Badge unlock detection ────────────────────────────────────────────────────
+  const earnedSig = badges.filter((b) => b.got).map((b) => b.id).sort().join(",");
+  const earnedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!hydrated) return;
+    if (earnedRef.current === null) {
+      earnedRef.current = earnedSig;
+      return;
+    }
+    if (earnedSig !== earnedRef.current) {
+      const prev = new Set(earnedRef.current.split(",").filter(Boolean));
+      const newly = badges.filter((b) => b.got && !prev.has(b.id));
+      earnedRef.current = earnedSig;
+      if (newly.length) setUnlockedBadge(newly[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, earnedSig]);
+
+  // ── Actions ──────────────────────────────────────────────────────────────────
   const sendMsg = (crewId: string) => {
     if (!draft.trim()) return;
     const nc = crews.map((c) =>
@@ -116,6 +134,15 @@ export default function Home() {
     persist({ crews: nc });
   };
 
+  const crewMeta = (visibility: string): { crew: string; color: string } => {
+    if (visibility.startsWith("crew:")) {
+      const c = crews.find((x) => x.id === visibility.split(":")[1]);
+      return { crew: c?.name ?? "Crew", color: c?.color ?? "var(--ink)" };
+    }
+    if (visibility === "community") return { crew: "Community", color: "var(--pink)" };
+    return { crew: "Just me", color: "var(--ink)" };
+  };
+
   const addLog = ({
     spot,
     ft,
@@ -131,7 +158,18 @@ export default function Home() {
     note: string;
     visibility: string;
   }) => {
-    const entry: Session = { id: "m" + Date.now(), spot, ft, wind, rating, note, t: "Now" };
+    const meta = crewMeta(visibility);
+    const entry: Session = {
+      id: "m" + Date.now(),
+      spot,
+      ft,
+      wind,
+      rating,
+      note,
+      t: "Today",
+      crew: meta.crew,
+      crewColor: meta.color,
+    };
     const ms = [entry, ...mySessions];
     let nc = crews;
     let ncm = community;
@@ -160,6 +198,9 @@ export default function Home() {
           likes: 0,
           comments: 0,
           liked: false,
+          mine: true,
+          t: "Just now",
+          commentList: [],
         },
         ...community,
       ];
@@ -172,8 +213,63 @@ export default function Home() {
     setLogging(false);
   };
 
-  // Open a spot sheet — and reveal it on the map if it was still undiscovered
-  // (the collection loop: tap an unknown pin → it gets charted).
+  const addPost = ({ cap, mood, clip }: { cap: string; mood: CommunityPost["mood"]; clip: boolean }) => {
+    const post: CommunityPost = {
+      id: "p" + Date.now(),
+      who: "you",
+      clip,
+      mood,
+      cap,
+      likes: 0,
+      comments: 0,
+      liked: false,
+      mine: true,
+      t: "Just now",
+      commentList: [],
+      videoUrl: clip ? SAMPLE_CLIP : undefined,
+    };
+    const ncm = [post, ...community];
+    setCommunity(ncm);
+    persist({ community: ncm });
+    setComposing(false);
+    setView("feed");
+  };
+
+  const addComment = (postId: string, text: string) => {
+    const ncm = community.map((p) =>
+      p.id === postId
+        ? {
+            ...p,
+            comments: (p.commentList?.length ?? p.comments) + 1,
+            commentList: [...(p.commentList ?? []), { id: "k" + Date.now(), who: "you", text, t: "now" }],
+          }
+        : p
+    );
+    setCommunity(ncm);
+    persist({ community: ncm });
+  };
+
+  const createCrew = ({ name, emblem, color }: { name: string; emblem: string; color: string }) => {
+    const id = "crew-" + Date.now();
+    const crew: Crew = {
+      id,
+      name,
+      emblem,
+      color,
+      members: ["You"],
+      thread: [
+        { id: "ct" + Date.now(), type: "text", who: "You", text: `Founded ${name}. Let's find some waves. 🤙`, t: "Now" },
+      ],
+    };
+    const nc = [...crews, crew];
+    setCrews(nc);
+    persist({ crews: nc });
+    setCreatingCrew(false);
+    setView("crews");
+    setActiveCrew(crew);
+  };
+
+  // Open a spot sheet — reveal it on the map if still undiscovered (collection loop)
   const openSpot = (s: Spot) => {
     if (!discovered.includes(s.id) && !s.userDropped) {
       const dis = [...discovered, s.id];
@@ -195,8 +291,7 @@ export default function Home() {
     const newId = "user-" + Date.now();
     let crewName: string | undefined;
     if (visibility.startsWith("crew:")) {
-      const cid = visibility.split(":")[1];
-      crewName = crews.find((c) => c.id === cid)?.name;
+      crewName = crews.find((c) => c.id === visibility.split(":")[1])?.name;
     }
     const newSpot: Spot = {
       id: newId,
@@ -245,19 +340,21 @@ export default function Home() {
     setPendingPin(null);
   };
 
-  const go = (v: View) => {
+  const go = (v: "home" | "crews" | "map" | "profile") => {
     setActiveCrew(null);
     setActiveSpot(null);
     setView(v);
   };
 
-  const streak = 4 + mySessions.length;
-  const sessionCount = 27 + mySessions.length;
-  const badges = buildBadges(mySessions, userPins, sessionCount);
-  const currentCrew = activeCrew ? crews.find((c) => c.id === activeCrew.id) ?? null : null;
+  const startDropFromDock = () => {
+    setActiveCrew(null);
+    setActiveSpot(null);
+    setView("map");
+    setDropMode(true);
+  };
 
   const showMasthead = !activeCrew && !logging;
-  const showBottomNav = !activeCrew && !logging;
+  const showDock = !activeCrew && !logging;
 
   if (!hydrated) return null; // avoid SSR flash
 
@@ -278,11 +375,11 @@ export default function Home() {
           flexDirection: "column",
         }}
       >
-        {/* Masthead — minimal */}
+        {/* Masthead */}
         {showMasthead && (
           <header
             style={{
-              padding: "16px 20px 14px",
+              padding: "16px 20px 12px",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
@@ -291,8 +388,13 @@ export default function Home() {
               zIndex: 4,
             }}
           >
-            <div
+            <button
+              onClick={() => go("home")}
               style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                padding: 0,
                 fontFamily: "var(--font-bagel), 'Bagel Fat One', sans-serif",
                 fontSize: 28,
                 letterSpacing: "-0.5px",
@@ -301,8 +403,10 @@ export default function Home() {
               }}
             >
               lineup.
-            </div>
-            <div
+            </button>
+            <button
+              onClick={() => go("profile")}
+              className="lu-press"
               style={{
                 width: 38,
                 height: 38,
@@ -312,24 +416,44 @@ export default function Home() {
                 border: "2.5px solid var(--ink)",
                 display: "grid",
                 placeItems: "center",
+                cursor: "pointer",
                 fontFamily: "var(--font-jetbrains), 'JetBrains Mono', monospace",
                 fontWeight: 700,
                 fontSize: 11,
               }}
+              aria-label="Your profile"
             >
               YO
-            </div>
+            </button>
           </header>
         )}
 
-        {/* View content — animated on tab/crew change */}
+        {/* View content */}
         <div
           key={view + (activeCrew?.id ?? "")}
           className="view-enter"
-          style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}
+          style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column", isolation: "isolate" }}
         >
+          {view === "home" && !activeCrew && (
+            <Home
+              name="Luke"
+              firingSpot={firingSpot}
+              sessions={sessionCount}
+              streak={streak}
+              collected={collected}
+              total={total}
+              crews={crews}
+              community={community}
+              recent={mySessions}
+              onOpenCrew={(c) => { setView("crews"); setActiveCrew(c); }}
+              onOpenSpot={openSpot}
+              onSeeFeed={() => setView("feed")}
+              onSeeJournal={() => go("profile")}
+            />
+          )}
+
           {view === "crews" && !activeCrew && (
-            <CrewsList crews={crews} onOpen={(c) => setActiveCrew(c)} />
+            <CrewsList crews={crews} onOpen={(c) => setActiveCrew(c)} onNew={() => setCreatingCrew(true)} />
           )}
           {view === "crews" && currentCrew && (
             <CrewThread
@@ -340,6 +464,7 @@ export default function Home() {
               onBack={() => setActiveCrew(null)}
             />
           )}
+
           {view === "map" && (
             <MapView
               discovered={discovered}
@@ -352,98 +477,54 @@ export default function Home() {
               onPlacePin={(lat, lng) => setPendingPin({ lat, lng })}
             />
           )}
-          {view === "community" && (
-            <Community posts={community} onLike={toggleLike} />
+
+          {view === "feed" && (
+            <Community posts={community} onLike={toggleLike} onAddComment={addComment} onCompose={() => setComposing(true)} />
           )}
+
           {view === "profile" && (
             <Profile
               streak={streak}
               sessions={sessionCount}
               crews={crews}
-              collected={discovered.length}
-              total={6 + userPins.length}
+              collected={collected}
+              total={total}
               badges={badges}
+              sessionsList={mySessions}
               onCrewClick={(c) => { setActiveCrew(c); setView("crews"); }}
+              onBadgeClick={(b) => setActiveBadge(b)}
             />
           )}
         </div>
 
-        {/* Floating pill nav */}
-        {showBottomNav && (
-          <div
-            style={{
-              flexShrink: 0,
-              padding: "6px 20px 28px",
-              background: "var(--cream)",
-              zIndex: 4,
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                background: "var(--ink)",
-                borderRadius: 100,
-                padding: "6px",
-                boxShadow: "0 8px 32px rgba(42,31,21,.22), 0 2px 8px rgba(42,31,21,.12)",
-                gap: 2,
-              }}
-            >
-              <PillBtn icon={Users}   active={view === "crews"}     onClick={() => go("crews")} />
-              <PillBtn icon={MapIcon} active={view === "map"}       onClick={() => go("map")} />
-              <button
-                onClick={() => setLogging(true)}
-                style={{
-                  width: 52,
-                  height: 52,
-                  borderRadius: "50%",
-                  background: "var(--pink)",
-                  color: "var(--cream)",
-                  border: "3px solid var(--ink)",
-                  display: "grid",
-                  placeItems: "center",
-                  cursor: "pointer",
-                  flexShrink: 0,
-                  boxShadow: "0 4px 16px rgba(230,51,109,.5)",
-                }}
-              >
-                <Plus size={22} strokeWidth={2.5} />
-              </button>
-              <PillBtn icon={Waves}   active={view === "community"} onClick={() => go("community")} />
-              <PillBtn icon={User}    active={view === "profile"}   onClick={() => go("profile")} />
-            </div>
-          </div>
+        {/* Interactive dock */}
+        {showDock && (
+          <Dock
+            view={view as DockView}
+            onNav={go}
+            onLog={() => setLogging(true)}
+            onDropPin={startDropFromDock}
+            onNewCrew={() => setCreatingCrew(true)}
+            onNewPost={() => setComposing(true)}
+          />
         )}
 
-        {/* Overlay sheets — position: absolute covers full container */}
+        {/* Overlay sheets */}
         {activeSpot && (
-          <SpotSheet
-            spot={activeSpot}
-            onClose={() => setActiveSpot(null)}
-            onLog={() => { setActiveSpot(null); setLogging(true); }}
-          />
+          <SpotSheet spot={activeSpot} onClose={() => setActiveSpot(null)} onLog={() => { setActiveSpot(null); setLogging(true); }} />
         )}
-        {logging && (
-          <LogModal
-            crews={crews}
-            onClose={() => setLogging(false)}
-            onSubmit={addLog}
-          />
-        )}
+        {logging && <LogModal crews={crews} onClose={() => setLogging(false)} onSubmit={addLog} />}
         {dropMode && pendingPin && (
-          <NewPinSheet
-            crews={crews}
-            onCancel={() => { setDropMode(false); setPendingPin(null); }}
-            onConfirm={confirmPin}
-          />
+          <NewPinSheet crews={crews} onCancel={() => { setDropMode(false); setPendingPin(null); }} onConfirm={confirmPin} />
         )}
+        {creatingCrew && <NewCrewSheet onCancel={() => setCreatingCrew(false)} onConfirm={createCrew} />}
+        {composing && <PostComposer onCancel={() => setComposing(false)} onSubmit={addPost} />}
+        {activeBadge && <BadgeSheet badge={activeBadge} onClose={() => setActiveBadge(null)} />}
+        {unlockedBadge && <BadgeUnlock badge={unlockedBadge} onClose={() => setUnlockedBadge(null)} />}
       </div>
 
-      {/* ── DESKTOP CTA (shown md+, until /dashboard is built) ── */}
-      <div
-        className="hidden md:flex md:flex-col"
-        style={{ minHeight: "100vh", background: "var(--cream2)" }}
-      >
+      {/* ── DESKTOP (shown md+) ── */}
+      <div className="hidden md:flex md:flex-col" style={{ minHeight: "100vh", background: "var(--cream2)" }}>
         <header
           style={{
             position: "sticky",
@@ -457,16 +538,7 @@ export default function Home() {
             justifyContent: "space-between",
           }}
         >
-          <div
-            style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              bottom: -3,
-              height: 3,
-              background: "var(--mustard)",
-            }}
-          />
+          <div style={{ position: "absolute", left: 0, right: 0, bottom: -3, height: 3, background: "var(--mustard)" }} />
           <div
             style={{
               fontFamily: "var(--font-bagel), 'Bagel Fat One', sans-serif",
@@ -479,7 +551,7 @@ export default function Home() {
             lineup.
           </div>
           <nav style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            {["Home", "Crews", "Map", "Feed", "Journal"].map((label, i) => (
+            {["Home", "Crews", "Map", "Feed", "You"].map((label, i) => (
               <button
                 key={label}
                 style={{
@@ -500,58 +572,31 @@ export default function Home() {
               </button>
             ))}
           </nav>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <a
-              href="/dashboard"
-              style={{
-                background: "var(--pink)",
-                color: "var(--cream)",
-                border: "none",
-                padding: "10px 16px",
-                borderRadius: 6,
-                cursor: "pointer",
-                fontFamily: "var(--font-jetbrains), 'JetBrains Mono', monospace",
-                fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: "1.2px",
-                textTransform: "uppercase",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                boxShadow: "0 3px 10px -2px rgba(230,51,109,.4)",
-                textDecoration: "none",
-              }}
-            >
-              <Plus size={14} />
-              Dashboard
-            </a>
-            <div
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: "50%",
-                background: "var(--mustard)",
-                color: "var(--ink)",
-                border: "2px solid var(--line)",
-                display: "grid",
-                placeItems: "center",
-                fontFamily: "var(--font-jetbrains), 'JetBrains Mono', monospace",
-                fontWeight: 700,
-                fontSize: 11,
-              }}
-            >
-              YO
-            </div>
-          </div>
+          <a
+            href="/dashboard"
+            style={{
+              background: "var(--pink)",
+              color: "var(--cream)",
+              border: "none",
+              padding: "10px 16px",
+              borderRadius: 6,
+              cursor: "pointer",
+              fontFamily: "var(--font-jetbrains), 'JetBrains Mono', monospace",
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: "1.2px",
+              textTransform: "uppercase",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              boxShadow: "0 3px 10px -2px rgba(230,51,109,.4)",
+              textDecoration: "none",
+            }}
+          >
+            <Plus size={14} /> Dashboard
+          </a>
         </header>
-        <main
-          style={{
-            maxWidth: 1280,
-            margin: "0 auto",
-            padding: "48px 36px 80px",
-            width: "100%",
-          }}
-        >
+        <main style={{ maxWidth: 1280, margin: "0 auto", padding: "48px 36px 80px", width: "100%" }}>
           <div
             style={{
               fontFamily: "var(--font-jetbrains), 'JetBrains Mono', monospace",

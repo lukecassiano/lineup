@@ -58,6 +58,13 @@ export interface Spot {
   visibility?: string;
 }
 
+export interface Comment {
+  id: string;
+  who: string;
+  text: string;
+  t: string;
+}
+
 export interface CommunityPost {
   id: string;
   who: string;
@@ -67,6 +74,13 @@ export interface CommunityPost {
   likes: number;
   comments: number;
   liked: boolean;
+  /** Comment thread. `comments` count is derived from this when present. */
+  commentList?: Comment[];
+  /** Optional real video source; falls back to the animated clip placeholder. */
+  videoUrl?: string;
+  /** True for the current user's own posts. */
+  mine?: boolean;
+  t?: string;
 }
 
 export interface Session {
@@ -77,6 +91,8 @@ export interface Session {
   rating: number;
   note?: string;
   t: string;
+  crew?: string;
+  crewColor?: string;
 }
 
 export interface AppState {
