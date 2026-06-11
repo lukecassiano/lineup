@@ -10,4 +10,6 @@ export const storage = {
   },
 };
 
-export const STATE_KEY = "lineup-mvp:state";
+// v2: migrated Spot from x/y screen coords to real lat/lng. Bumping the key
+// cleanly drops any pre-migration state (MVP — no data-migration concern).
+export const STATE_KEY = "lineup-mvp:state:v2";

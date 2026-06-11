@@ -45,14 +45,24 @@ export interface Spot {
   id: string;
   name: string;
   type: SpotType;
-  x: number;
-  y: number;
+  /** Real geographic coordinates. */
+  lat: number;
+  lng: number;
+  /** Human-readable locale, e.g. "Newport Beach, CA". */
+  region?: string;
   secret: boolean;
   cond: Condition;
   crew?: string;
   by?: string;
   userDropped?: boolean;
   visibility?: string;
+}
+
+export interface Comment {
+  id: string;
+  who: string;
+  text: string;
+  t: string;
 }
 
 export interface CommunityPost {
@@ -64,6 +74,13 @@ export interface CommunityPost {
   likes: number;
   comments: number;
   liked: boolean;
+  /** Comment thread. `comments` count is derived from this when present. */
+  commentList?: Comment[];
+  /** Optional real video source; falls back to the animated clip placeholder. */
+  videoUrl?: string;
+  /** True for the current user's own posts. */
+  mine?: boolean;
+  t?: string;
 }
 
 export interface Session {
@@ -74,6 +91,8 @@ export interface Session {
   rating: number;
   note?: string;
   t: string;
+  crew?: string;
+  crewColor?: string;
 }
 
 export interface AppState {

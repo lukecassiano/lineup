@@ -7,6 +7,7 @@ import { initials } from "@/lib/utils";
 interface Props {
   crews: Crew[];
   onOpen: (crew: Crew) => void;
+  onNew: () => void;
 }
 
 function getPreview(item: ThreadItem): string {
@@ -15,10 +16,10 @@ function getPreview(item: ThreadItem): string {
   return `pinned ${item.spot}`;
 }
 
-export default function CrewsList({ crews, onOpen }: Props) {
+export default function CrewsList({ crews, onOpen, onNew }: Props) {
   return (
     <div
-      style={{ flex: 1, overflowY: "auto", padding: "4px 22px 24px" }}
+      style={{ flex: 1, overflowY: "auto", padding: "4px 22px 120px" }}
       className="scroll-hide"
     >
       {/* Section heading */}
@@ -138,7 +139,7 @@ export default function CrewsList({ crews, onOpen }: Props) {
       })}
 
       {/* New crew ghost CTA */}
-      <button style={{
+      <button onClick={onNew} className="lu-press" style={{
         width: "100%", padding: "16px 18px",
         borderRadius: 14,
         border: "1.5px dashed var(--line2)",
