@@ -1,6 +1,6 @@
 "use client";
 
-import { Lock, Wind, Navigation, Plus } from "lucide-react";
+import { Lock, Wind, Navigation, Plus, MapPin } from "lucide-react";
 import type { Spot } from "@/lib/types";
 import { condColor, condLabel } from "@/lib/utils";
 
@@ -62,12 +62,24 @@ export default function SpotSheet({ spot, onClose, onLog }: Props) {
             {spot.secret ? `${spot.crew || "YOUR"} · SECRET` : condLabel(spot.cond)} · {spot.type}
           </span>
 
+          {/* Region caption */}
+          {spot.region && (
+            <div style={{
+              fontFamily: "var(--font-jetbrains), 'JetBrains Mono', monospace",
+              fontSize: 9.5, letterSpacing: "1.5px", textTransform: "uppercase",
+              color: "var(--soft)", fontWeight: 600,
+              marginTop: 14, display: "flex", alignItems: "center", gap: 5,
+            }}>
+              <MapPin size={11} /> {spot.region}
+            </div>
+          )}
+
           {/* Spot name */}
           <div style={{
             fontFamily: "var(--font-fraunces), 'Fraunces', serif",
             fontSize: 40, fontWeight: 700, letterSpacing: "-1.5px",
             lineHeight: 0.95, color: "var(--ink)",
-            marginTop: 14, marginBottom: 20,
+            marginTop: spot.region ? 6 : 14, marginBottom: 20,
           }}>
             {spot.name}
           </div>
@@ -142,14 +154,25 @@ export default function SpotSheet({ spot, onClose, onLog }: Props) {
             }}>
               <Plus size={15} /> Log session
             </button>
-            <button style={{
-              fontFamily: "var(--font-jetbrains), 'JetBrains Mono', monospace",
-              fontSize: 11, letterSpacing: "1.5px", textTransform: "uppercase",
-              fontWeight: 700, padding: "14px 16px", borderRadius: 100,
-              border: "1.5px solid var(--line2)", cursor: "pointer",
-              background: "transparent", color: "var(--ink)",
-              display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7,
-            }}>
+            <button
+              onClick={() =>
+                window.open(
+                  `https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lng}`,
+                  "_blank",
+                  "noopener,noreferrer"
+                )
+              }
+              className="lu-press"
+              style={{
+                fontFamily: "var(--font-jetbrains), 'JetBrains Mono', monospace",
+                fontSize: 11, letterSpacing: "1.5px", textTransform: "uppercase",
+                fontWeight: 700, padding: "14px 16px", borderRadius: 100,
+                border: "1.5px solid var(--line2)", cursor: "pointer",
+                background: "transparent", color: "var(--ink)",
+                display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7,
+              }}
+              aria-label="Directions"
+            >
               <Navigation size={15} />
             </button>
           </div>

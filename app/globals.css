@@ -74,3 +74,109 @@ html, body {
 /* Hide scrollbar in threads/lists */
 .scroll-hide { scrollbar-width: none; }
 .scroll-hide::-webkit-scrollbar { display: none; }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   LEAFLET MAP — harmonized with the catalog palette
+   ════════════════════════════════════════════════════════════════════════════ */
+.leaflet-container {
+  background: var(--cream) !important;
+  font-family: var(--font-jetbrains), 'JetBrains Mono', monospace;
+  outline: none;
+}
+/* Warm the cool default tiles into the parchment palette */
+.leaflet-tile-pane {
+  filter: sepia(0.35) saturate(0.85) hue-rotate(-8deg) brightness(1.02);
+}
+/* Custom DivIcon: strip Leaflet's default white box */
+.lu-pin-wrap { background: transparent !important; border: none !important; }
+.lu-pin { position: relative; display: grid; place-items: center; }
+.lu-dot {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2.5px solid var(--cream);
+  display: grid; place-items: center;
+  transition: transform .15s cubic-bezier(.34,1.56,.64,1);
+}
+.lu-pin-wrap:hover .lu-dot { transform: scale(1.25); }
+.lu-label {
+  position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+  font-family: var(--font-jetbrains), 'JetBrains Mono', monospace;
+  font-size: 8px; font-weight: 700; letter-spacing: .4px;
+  color: var(--ink); background: var(--cream);
+  padding: 2px 5px; border-radius: 3px; white-space: nowrap;
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 3px rgba(42,31,21,.25);
+}
+.lu-label--mine { border-color: var(--pink); color: var(--terra); }
+.lu-pending {
+  display: block; width: 16px; height: 16px; margin: 2px;
+  border-radius: 50%; background: var(--pink);
+  border: 3px solid var(--cream);
+  animation: pendpulse 1.4s ease infinite;
+}
+@keyframes pendpulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(230,51,109,.5); }
+  50%       { box-shadow: 0 0 0 11px rgba(230,51,109,0); }
+}
+.lu-map-drop .leaflet-container,
+.lu-map-drop .leaflet-grab,
+.lu-map-drop .leaflet-interactive { cursor: crosshair !important; }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   MOTION — app-native micro-interactions
+   ════════════════════════════════════════════════════════════════════════════ */
+@keyframes spin { to { transform: rotate(360deg); } }
+.lu-spin-slow { animation: spin 3.5s linear infinite; }
+.lu-pulse-text { animation: pulse 1.4s ease infinite; }
+
+/* Tactile press — spring scale-down on tap */
+.lu-press { transition: transform .14s cubic-bezier(.34,1.56,.64,1); will-change: transform; }
+.lu-press:active { transform: scale(.93); }
+
+/* Spring pop-in for cards / sheet contents */
+@keyframes pop {
+  0%   { opacity: 0; transform: scale(.92) translateY(10px); }
+  60%  { opacity: 1; }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+.pop { animation: pop .42s cubic-bezier(.34,1.56,.64,1) both; }
+
+/* Radial action fan-out */
+@keyframes fanIn {
+  from { opacity: 0; transform: translateY(14px) scale(.8); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.fan-in { animation: fanIn .32s cubic-bezier(.34,1.56,.64,1) both; }
+
+/* Dock active-tab indicator settle */
+@keyframes dockPop {
+  0% { transform: scale(.6); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Badge unlock celebration */
+@keyframes unlockPop {
+  0%   { transform: scale(.4) rotate(-12deg); opacity: 0; }
+  55%  { transform: scale(1.18) rotate(4deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+.unlock-pop { animation: unlockPop .6s cubic-bezier(.34,1.56,.64,1) both; }
+
+@keyframes confettiFall {
+  0%   { transform: translateY(-10px) rotate(0); opacity: 1; }
+  100% { transform: translateY(120px) rotate(320deg); opacity: 0; }
+}
+
+/* Scrim fade for overlays */
+@keyframes scrimIn { from { opacity: 0; } to { opacity: 1; } }
+.scrim-in { animation: scrimIn .2s ease both; }
+
+/* Soft pulsing ring for "live" affordances */
+@keyframes livePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(230,51,109,.45); }
+  50%       { box-shadow: 0 0 0 7px rgba(230,51,109,0); }
+}
+.live-pulse { animation: livePulse 1.8s ease infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; }
+}

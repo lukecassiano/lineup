@@ -57,7 +57,7 @@ export default function Home() {
 
   // Drop-pin flow
   const [dropMode, setDropMode] = useState(false);
-  const [pendingPin, setPendingPin] = useState<{ x: number; y: number } | null>(null);
+  const [pendingPin, setPendingPin] = useState<{ lat: number; lng: number } | null>(null);
 
   // App state (persisted)
   const [crews, setCrews] = useState<Crew[]>(SEED_CREWS);
@@ -172,6 +172,17 @@ export default function Home() {
     setLogging(false);
   };
 
+  // Open a spot sheet — and reveal it on the map if it was still undiscovered
+  // (the collection loop: tap an unknown pin → it gets charted).
+  const openSpot = (s: Spot) => {
+    if (!discovered.includes(s.id) && !s.userDropped) {
+      const dis = [...discovered, s.id];
+      setDiscovered(dis);
+      persist({ discovered: dis });
+    }
+    setActiveSpot(s);
+  };
+
   const toggleLike = (id: string) => {
     const nc = community.map((p) =>
       p.id === id ? { ...p, liked: !p.liked, likes: p.likes + (p.liked ? -1 : 1) } : p
@@ -191,8 +202,9 @@ export default function Home() {
       id: newId,
       name,
       type: type as Spot["type"],
-      x: pendingPin!.x,
-      y: pendingPin!.y,
+      lat: pendingPin!.lat,
+      lng: pendingPin!.lng,
+      region: crewName ? `Crew · ${crewName}` : visibility === "community" ? "Public pin" : "Private pin",
       secret: visibility !== "community",
       cond: "fair",
       by: "You",
@@ -334,10 +346,10 @@ export default function Home() {
               userPins={userPins}
               dropMode={dropMode}
               pendingPin={pendingPin}
-              onSpot={(s) => !dropMode && setActiveSpot(s)}
+              onSpot={(s) => !dropMode && openSpot(s)}
               onStartDrop={() => setDropMode(true)}
               onCancelDrop={() => { setDropMode(false); setPendingPin(null); }}
-              onPlacePin={(x, y) => setPendingPin({ x, y })}
+              onPlacePin={(lat, lng) => setPendingPin({ lat, lng })}
             />
           )}
           {view === "community" && (

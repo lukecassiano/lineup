@@ -1,13 +1,16 @@
 import type { Crew, Spot, CommunityPost } from "./types";
+import { CA_SPOTS } from "./spots";
 
-export const SPOTS: Spot[] = [
-  { id: "trestles", name: "Trestles",    type: "Point", x: 60, y: 20, secret: false, cond: "fair"   },
-  { id: "wedge",    name: "The Wedge",   type: "Beach", x: 72, y: 44, secret: false, cond: "firing" },
-  { id: "blacks",   name: "Blacks",      type: "Beach", x: 50, y: 68, secret: false, cond: "flat"   },
-  { id: "ghost",    name: "Ghost Reef",  type: "Reef",  x: 40, y: 32, secret: true,  cond: "fair",   crew: "Dawn Patrol", by: "Maya R." },
-  { id: "keyhole",  name: "The Keyhole", type: "Reef",  x: 34, y: 54, secret: true,  cond: "fair",   crew: "Dawn Patrol", by: "You" },
-  { id: "pole9",    name: "Pole 9",      type: "Beach", x: 56, y: 86, secret: true,  cond: "fair",   crew: "South Swell", by: "Theo K." },
+// Crew-secret spots — locked to outsiders, visible only to members.
+// Real-ish coordinates tucked along the coastline.
+export const SECRET_SPOTS: Spot[] = [
+  { id: "ghost",   name: "Ghost Reef",  type: "Reef",  lat: 33.5520, lng: -117.8620, region: "Crew · Dawn Patrol",  secret: true, cond: "firing", crew: "Dawn Patrol", by: "Maya R." },
+  { id: "keyhole", name: "The Keyhole", type: "Reef",  lat: 33.4520, lng: -117.7180, region: "Crew · Dawn Patrol",  secret: true, cond: "fair",   crew: "Dawn Patrol", by: "You"    },
+  { id: "pole9",   name: "Pole 9",      type: "Beach", lat: 33.6280, lng: -117.9340, region: "Crew · South Swell",  secret: true, cond: "fair",   crew: "South Swell", by: "Theo K." },
 ];
+
+// All seeded spots = public CA breaks + crew secrets.
+export const SPOTS: Spot[] = [...CA_SPOTS, ...SECRET_SPOTS];
 
 export const SEED_CREWS: Crew[] = [
   {
@@ -43,4 +46,10 @@ export const SEED_COMMUNITY: CommunityPost[] = [
   { id: "c4", who: "tideandtype",clip: false, mood: "flat",   cap: "flat day. logged it anyway. a journal is a journal.",            likes: 56,  comments: 4,  liked: false },
 ];
 
-export const INITIAL_DISCOVERED = ["trestles", "wedge", "ghost", "keyhole"];
+// Spots the user already knows on day one. The rest reveal as you tap them on
+// the map (the collection loop). Famous breaks + the crew secrets you're in on.
+export const INITIAL_DISCOVERED = [
+  "lowers", "trestles", "wedge", "malibu", "swamis",
+  "steamer-lane", "ocean-beach", "mavericks", "rincon",
+  "ghost", "keyhole", "pole9",
+];

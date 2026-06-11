@@ -45,8 +45,11 @@ export interface Spot {
   id: string;
   name: string;
   type: SpotType;
-  x: number;
-  y: number;
+  /** Real geographic coordinates. */
+  lat: number;
+  lng: number;
+  /** Human-readable locale, e.g. "Newport Beach, CA". */
+  region?: string;
   secret: boolean;
   cond: Condition;
   crew?: string;

@@ -310,13 +310,16 @@ export default function Dashboard() {
                     <text x="0" y="-4" fontFamily="JetBrains Mono" fontSize="1.8" fill="var(--soft)" textAnchor="middle" fontWeight="700">N</text>
                   </g>
                 </svg>
-                {/* Spot pins */}
-                {SPOTS.map((s) => {
+                {/* Spot pins — lat/lng projected into the preview box */}
+                {SPOTS.slice(0, 8).map((s) => {
                   const firing = s.cond === "firing" && !s.secret;
                   const pinColor = s.secret ? "var(--ink)" : condColor(s.cond);
+                  // Rough CA projection: lng -122.8..-117.4 → x, lat 32.6..38.0 → y (inverted)
+                  const px = ((s.lng + 122.8) / 5.4) * 70 + 12;
+                  const py = (1 - (s.lat - 32.6) / 5.4) * 90 + 4;
                   return (
                     <button key={s.id} onClick={() => setActiveSpot(s)} style={{
-                      position: "absolute", left: s.x + "%", top: s.y + "%",
+                      position: "absolute", left: px + "%", top: py + "%",
                       transform: "translate(-50%,-50%)",
                       background: "none", border: "none", cursor: "pointer",
                       display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
