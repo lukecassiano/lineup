@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Plus } from "lucide-react";
 
 import Home from "@/components/Home";
 import Dock, { type DockView } from "@/components/Dock";
+import DesktopApp, { type LineupApi } from "@/components/DesktopApp";
 import CrewsList from "@/components/CrewsList";
 import CrewThread from "@/components/CrewThread";
 import MapView from "@/components/MapView";
@@ -115,22 +115,20 @@ export default function Home_Page() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, earnedSig]);
 
-  // ── Actions ──────────────────────────────────────────────────────────────────
-  const sendMsg = (crewId: string) => {
-    if (!draft.trim()) return;
+  // ── Data committers (pure data ops, shared by mobile + desktop) ───────────────
+  const commitMsg = (crewId: string, text: string) => {
     const nc = crews.map((c) =>
       c.id === crewId
         ? {
             ...c,
             thread: [
               ...c.thread,
-              { id: "x" + Date.now(), type: "text" as const, who: "You", text: draft, t: "Now" },
+              { id: "x" + Date.now(), type: "text" as const, who: "You", text, t: "Now" },
             ],
           }
         : c
     );
     setCrews(nc);
-    setDraft("");
     persist({ crews: nc });
   };
 
@@ -143,7 +141,7 @@ export default function Home_Page() {
     return { crew: "Just me", color: "var(--ink)" };
   };
 
-  const addLog = ({
+  const commitLog = ({
     spot,
     ft,
     wind,
@@ -210,10 +208,9 @@ export default function Home_Page() {
     setCrews(nc);
     setCommunity(ncm);
     persist({ mySessions: ms, crews: nc, community: ncm });
-    setLogging(false);
   };
 
-  const addPost = ({ cap, mood, clip }: { cap: string; mood: CommunityPost["mood"]; clip: boolean }) => {
+  const commitPost = ({ cap, mood, clip }: { cap: string; mood: CommunityPost["mood"]; clip: boolean }) => {
     const post: CommunityPost = {
       id: "p" + Date.now(),
       who: "you",
@@ -231,11 +228,9 @@ export default function Home_Page() {
     const ncm = [post, ...community];
     setCommunity(ncm);
     persist({ community: ncm });
-    setComposing(false);
-    setView("feed");
   };
 
-  const addComment = (postId: string, text: string) => {
+  const commitComment = (postId: string, text: string) => {
     const ncm = community.map((p) =>
       p.id === postId
         ? {
@@ -249,7 +244,7 @@ export default function Home_Page() {
     persist({ community: ncm });
   };
 
-  const createCrew = ({ name, emblem, color }: { name: string; emblem: string; color: string }) => {
+  const commitCrew = ({ name, emblem, color }: { name: string; emblem: string; color: string }): Crew => {
     const id = "crew-" + Date.now();
     const crew: Crew = {
       id,
@@ -264,22 +259,19 @@ export default function Home_Page() {
     const nc = [...crews, crew];
     setCrews(nc);
     persist({ crews: nc });
-    setCreatingCrew(false);
-    setView("crews");
-    setActiveCrew(crew);
+    return crew;
   };
 
-  // Open a spot sheet — reveal it on the map if still undiscovered (collection loop)
-  const openSpot = (s: Spot) => {
+  // Reveal a spot on the map if still undiscovered (collection loop)
+  const discover = (s: Spot) => {
     if (!discovered.includes(s.id) && !s.userDropped) {
       const dis = [...discovered, s.id];
       setDiscovered(dis);
       persist({ discovered: dis });
     }
-    setActiveSpot(s);
   };
 
-  const toggleLike = (id: string) => {
+  const commitLike = (id: string) => {
     const nc = community.map((p) =>
       p.id === id ? { ...p, liked: !p.liked, likes: p.likes + (p.liked ? -1 : 1) } : p
     );
@@ -287,7 +279,19 @@ export default function Home_Page() {
     persist({ community: nc });
   };
 
-  const confirmPin = ({ name, type, visibility }: { name: string; type: string; visibility: string }) => {
+  const commitPin = ({
+    name,
+    type,
+    visibility,
+    lat,
+    lng,
+  }: {
+    name: string;
+    type: string;
+    visibility: string;
+    lat: number;
+    lng: number;
+  }) => {
     const newId = "user-" + Date.now();
     let crewName: string | undefined;
     if (visibility.startsWith("crew:")) {
@@ -297,8 +301,8 @@ export default function Home_Page() {
       id: newId,
       name,
       type: type as Spot["type"],
-      lat: pendingPin!.lat,
-      lng: pendingPin!.lng,
+      lat,
+      lng,
       region: crewName ? `Crew · ${crewName}` : visibility === "community" ? "Public pin" : "Private pin",
       secret: visibility !== "community",
       cond: "fair",
@@ -336,8 +340,63 @@ export default function Home_Page() {
       setCrews(nc);
     }
     persist({ userPins: up, discovered: dis, crews: nc });
+  };
+
+  // ── Mobile UI wrappers ────────────────────────────────────────────────────────
+  const sendMsg = (crewId: string) => {
+    if (!draft.trim()) return;
+    commitMsg(crewId, draft.trim());
+    setDraft("");
+  };
+  const addLog = (e: Parameters<typeof commitLog>[0]) => {
+    commitLog(e);
+    setLogging(false);
+  };
+  const addPost = (e: Parameters<typeof commitPost>[0]) => {
+    commitPost(e);
+    setComposing(false);
+    setView("feed");
+  };
+  const addComment = commitComment;
+  const toggleLike = commitLike;
+  const createCrew = (e: { name: string; emblem: string; color: string }) => {
+    const crew = commitCrew(e);
+    setCreatingCrew(false);
+    setView("crews");
+    setActiveCrew(crew);
+  };
+  const openSpot = (s: Spot) => {
+    discover(s);
+    setActiveSpot(s);
+  };
+  const confirmPin = (e: { name: string; type: string; visibility: string }) => {
+    if (!pendingPin) return;
+    commitPin({ ...e, lat: pendingPin.lat, lng: pendingPin.lng });
     setDropMode(false);
     setPendingPin(null);
+  };
+
+  // ── Shared API for the desktop layout ─────────────────────────────────────────
+  const api: LineupApi = {
+    crews,
+    community,
+    mySessions,
+    userPins,
+    discovered,
+    badges,
+    sessionCount,
+    streak,
+    collected,
+    total,
+    firingSpot,
+    commitMsg,
+    commitLog,
+    commitPost,
+    commitComment,
+    commitLike,
+    commitCrew,
+    commitPin,
+    discover,
   };
 
   const go = (v: "home" | "crews" | "map" | "profile") => {
@@ -523,125 +582,8 @@ export default function Home_Page() {
         {unlockedBadge && <BadgeUnlock badge={unlockedBadge} onClose={() => setUnlockedBadge(null)} />}
       </div>
 
-      {/* ── DESKTOP (shown md+) ── */}
-      <div className="hidden md:flex md:flex-col" style={{ minHeight: "100vh", background: "var(--cream2)" }}>
-        <header
-          style={{
-            position: "sticky",
-            top: 0,
-            zIndex: 20,
-            background: "var(--cream)",
-            borderBottom: "1.5px solid var(--line)",
-            padding: "14px 36px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <div style={{ position: "absolute", left: 0, right: 0, bottom: -3, height: 3, background: "var(--mustard)" }} />
-          <div
-            style={{
-              fontFamily: "var(--font-bagel), 'Bagel Fat One', sans-serif",
-              fontSize: 30,
-              letterSpacing: "-1px",
-              color: "var(--terra)",
-              lineHeight: 0.85,
-            }}
-          >
-            lineup.
-          </div>
-          <nav style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            {["Home", "Crews", "Map", "Feed", "You"].map((label, i) => (
-              <button
-                key={label}
-                style={{
-                  fontFamily: "var(--font-jetbrains), 'JetBrains Mono', monospace",
-                  fontSize: 11,
-                  fontWeight: 600,
-                  letterSpacing: "1.5px",
-                  textTransform: "uppercase",
-                  color: i === 0 ? "var(--cream)" : "var(--soft)",
-                  padding: "8px 14px",
-                  borderRadius: 4,
-                  background: i === 0 ? "var(--ink)" : "none",
-                  border: "none",
-                  cursor: "pointer",
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </nav>
-          <a
-            href="/dashboard"
-            style={{
-              background: "var(--pink)",
-              color: "var(--cream)",
-              border: "none",
-              padding: "10px 16px",
-              borderRadius: 6,
-              cursor: "pointer",
-              fontFamily: "var(--font-jetbrains), 'JetBrains Mono', monospace",
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: "1.2px",
-              textTransform: "uppercase",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              boxShadow: "0 3px 10px -2px rgba(230,51,109,.4)",
-              textDecoration: "none",
-            }}
-          >
-            <Plus size={14} /> Dashboard
-          </a>
-        </header>
-        <main style={{ maxWidth: 1280, margin: "0 auto", padding: "48px 36px 80px", width: "100%" }}>
-          <div
-            style={{
-              fontFamily: "var(--font-jetbrains), 'JetBrains Mono', monospace",
-              fontSize: 11,
-              letterSpacing: "3px",
-              textTransform: "uppercase",
-              color: "var(--terra)",
-              fontWeight: 700,
-            }}
-          >
-            Desktop dashboard
-          </div>
-          <div
-            style={{
-              fontFamily: "var(--font-fraunces), 'Fraunces', serif",
-              fontStyle: "italic",
-              fontWeight: 500,
-              fontSize: 64,
-              letterSpacing: "-2px",
-              lineHeight: 1.02,
-              color: "var(--ink)",
-              marginTop: 8,
-            }}
-          >
-            Coming up.
-          </div>
-          <p
-            style={{
-              fontFamily: "var(--font-newsreader), 'Newsreader', serif",
-              fontSize: 18,
-              fontStyle: "italic",
-              color: "var(--soft)",
-              lineHeight: 1.5,
-              marginTop: 16,
-              maxWidth: 480,
-            }}
-          >
-            The full dashboard is at{" "}
-            <a href="/dashboard" style={{ color: "var(--terra)" }}>
-              /dashboard
-            </a>
-            . Resize to mobile width to try the full app.
-          </p>
-        </main>
-      </div>
+      {/* ── DESKTOP (shown md+) — live, shares the same state via the API ── */}
+      <DesktopApp api={api} />
     </>
   );
 }
